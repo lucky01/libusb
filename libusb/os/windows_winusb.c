@@ -2320,14 +2320,36 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 
 static int winusbx_init(int sub_api, struct libusb_context *ctx)
 {
-	HMODULE h;
+	HMODULE h,hm = NULL;
 	bool native_winusb;
 	int i;
 	KLIB_VERSION LibK_Version;
 	LibK_GetProcAddress_t pLibK_GetProcAddress = NULL;
 	LibK_GetVersion_t pLibK_GetVersion;
 
-	h = LoadLibraryA("libusbK");
+	char filename[MAX_PATH];
+
+	if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+#ifdef _WIN64
+		"dmddevice64.dll",
+#else
+		"dmddevice.dll",
+#endif
+		&hm))
+	{
+		int ret = GetLastError();
+		fprintf(stderr, "GetModuleHandle returned %d\n", ret);
+	}
+
+	GetModuleFileName(hm, filename, MAX_PATH);
+	char *ptr = strrchr(filename, '\\');
+	strcpy_s(ptr + 1, 12, "libusbk.dll");
+
+	h = LoadLibraryA(filename);
+
+	if (h == NULL)
+		h = LoadLibraryA("libusbk");
 
 	if (h == NULL) {
 		usbi_info(ctx, "libusbK DLL is not available, will use native WinUSB");
